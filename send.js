@@ -41,34 +41,33 @@ async function startBot() {
 
                 let finalFile = "";
 
-                // 1. GitHub Link Handling
+                // --- Download Logic ---
                 if (fileId.includes("github.com") || fileId.includes("githubusercontent.com")) {
                     let rawUrl = fileId.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
-                    // ලින්ක් එකේ අන්තිමට තියෙන නම ගන්නවා (උදා: Climax EP01.vtt)
                     finalFile = decodeURIComponent(rawUrl.split('/').pop().split('?')[0]);
                     execSync(`curl -L "${rawUrl}" -o "${finalFile}"`);
                 } 
-                // 2. Google Drive / Other Handling
                 else {
-                    try {
-                        execSync(`gdown --fuzzy https://drive.google.com/uc?id=${fileId}`);
-                    } catch(e) {
-                        execSync(`gdown https://drive.google.com/uc?id=${fileId}`);
-                    }
+                    // Google Drive Download
+                    execSync(`gdown --fuzzy "https://drive.google.com/uc?id=${fileId}"`);
                     
                     const files = fs.readdirSync('.');
-                    // README.md ඇතුළු අනවශ්‍ය ෆයිල් අතහැරීම ✅
-                    const ignoreList = ['README.md', 'send.js', 'package.json', 'package-lock.json', 'node_modules', 'auth_info', '.github', '.git'];
-                    
+                    // README.md ඇතුළු අනවශ්‍ය දේවල් අත්හැරීම ✅
+                    const ignoreList = [
+                        'README.md', 'send.js', 'package.json', 'package-lock.json', 
+                        'node_modules', 'auth_info', '.github', '.git', 'LICENSE'
+                    ];
+
                     finalFile = files.find(f => 
                         !ignoreList.includes(f) && 
-                        !fs.lstatSync(f).isDirectory()
+                        !fs.lstatSync(f).isDirectory() &&
+                        (f.endsWith('.mkv') || f.endsWith('.mp4') || f.endsWith('.srt') || f.endsWith('.vtt') || f.endsWith('.zip'))
                     );
                 }
 
-                // ෆයිල් එක ඇත්තටම තියෙනවද බලනවා
                 if (!finalFile || !fs.existsSync(finalFile)) throw new Error("DL_FAILED");
 
+                console.log("📤 Selected File: " + finalFile);
                 await sock.sendMessage(userJid, { text: "📤 *Upload වෙමින් පවතී...*" });
 
                 const ext = path.extname(finalFile).toLowerCase();
@@ -82,21 +81,21 @@ async function startBot() {
                                    `☺️ *Mflix භාවිතා කළ ඔබට සුභ දවසක්...*\n` +
                                    `*කරුණාකර Report කිරීමෙන් වළකින්න...* 💝`;
 
+                // Uploading as Document
                 await sock.sendMessage(userJid, {
                     document: fs.readFileSync(`./${finalFile}`),
                     fileName: finalFile,
-                    mimetype: isSub ? "text/vtt" : "video/mp4", 
+                    mimetype: isSub ? "text/vtt" : "video/x-matroska", // MKV සඳහා ගැලපෙන MimeType
                     caption: finalCaption
                 });
 
-                // පාවිච්චි කරපු ෆයිල් එක මකලා දානවා
                 if (fs.existsSync(finalFile)) fs.unlinkSync(finalFile);
-                await delay(3000);
+                await delay(5000);
                 process.exit(0);
 
             } catch (err) {
                 console.error(err);
-                await sock.sendMessage(userJid, { text: "❌ *ගොනුව බාගත කිරීමේදී හෝ යැවීමේදී දෝෂයක් ඇති විය...*" });
+                await sock.sendMessage(userJid, { text: "❌ *බාගත කිරීමේදී හෝ යැවීමේදී දෝෂයක් සිදු විය...*" });
                 process.exit(1);
             }
         }
